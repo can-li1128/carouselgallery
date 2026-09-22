@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New Books</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  
+  <style>
+    :root {
+      --gap-size: 15px;
+      --visible-items: 7;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background-color: #f8f9fa;
+      color: #333;
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .status-container {
+      background: #fff;
+      padding: 15px 20px;
+      border-radius: 8px;
+      max-width: 600px;
+      margin: 0 auto 20px auto;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+
+    #status {
+      font-weight: bold;
+      color: #0056b3;
+    }
+
+    /* Screen Reader Only Helper Class */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    /* Carousel Outer Region */
+    .carousel-region {
+      display: none; /* Hidden until loaded */
+      max-width: 1200px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+      padding: 20px 15px;
+    }
+
+    /* Accessible Controls Header */
+    .carousel-controls {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-bottom: 15px;
+      padding-right: 5px;
+    }
+
+    .carousel-btn {
+      background: #0056b3;
+      color: #ffffff;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 4px;
+      font-size: 0.9rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+
+    .carousel-btn:hover, .carousel-btn:focus-visible {
+      background: #003d80;
+      outline: 3px solid #ffbf47;
+      outline-offset: 2px;
+    }
+
+    /* Carousel Window */
+    .carousel-wrapper {
+      position: relative;
+      width: 100%;
+      overflow: hidden;
+    }
+    
+    /* Sliding Track */
+    .carousel-track {
+      display: flex;
+      gap: var(--gap-size);
+      transition: transform 0.5s ease-in-out;
+    }
+
+    /* Responsive Book Card Calculation */
+    .book-card {
+      /* Dynamic width calculation based on --visible-items variable */
+      flex: 0 0 calc((100% - (var(--gap-size) * (var(--visible-items) - 1))) / var(--visible-items));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+      padding: 5px;
+    }
+
+    .book-card img {
+      width: 100%;
+      height: 220px;
+      object-fit: contain;
+      border-radius: 4px;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.18);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .book-card img:hover, .book-card a:focus-visible img {
+      transform: scale(1.15);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+    }
+
+    .book-card a:focus-visible {
+      outline: 3px solid #0056b3;
+      outline-offset: 4px;
+      border-radius: 4px;
+    }
+
+    /* --- RESPONSIVE BREAKPOINTS --- */
+    
+    /* Tablets (up to 1024px): 4 Items */
+    @media (max-width: 1024px) {
+      :root {
+        --visible-items: 4;
+      }
+      .book-card img { height: 190px; }
+    }
+
+    /* Mobile Landscape (up to 767px): 3 Items */
+    @media (max-width: 767px) {
+      :root {
+        --visible-items: 3;
+      }
+      .book-card img { height: 160px; }
+    }
+
+    /* Mobile Portrait (up to 480px): 2 Items */
+    @media (max-width: 480px) {
+      :root {
+        --visible-items: 2;
+      }
+      .book-card img { height: 140px; }
+      .carousel-controls {
+        justify-content: center;
+      }
+    }
+
+    /* Respect User Preference for Reduced Motion (WCAG 2.1) */
+    @media (prefers-reduced-motion: reduce) {
+      .carousel-track, .book-card img {
+        transition: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <main>
+    <h2>New Books</h2>
+
+    <div class="status-container">
+      <div id="status" role="status">Loading book data...</div>
+    </div>
+
+    <!-- Live region for Screen Reader Notifications -->
+    <div id="sr-status" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+    <section class="carousel-region" id="carouselRegion" aria-label="New Books Carousel">
+      
+      <!-- Accessible Controls -->
+      <nav class="carousel-controls" aria-label="Carousel Navigation">
+        <button id="prevBtn" class="carousel-btn" aria-label="Previous Slide">&lt; Prev</button>
+        <button id="togglePlayBtn" class="carousel-btn" aria-label="Pause Auto Rotation">Pause</button>
+        <button id="nextBtn" class="carousel-btn" aria-label="Next Slide">Next &gt;</button>
+      </nav>
+
+      <div class="carousel-wrapper">
+        <div class="carousel-track" id="carouselTrack" aria-live="off"></div>
+      </div>
+
+    </section>
+  </main>
+
+  <script>
+    const EXCEL_FILE_PATH = 'url_book-150d.xlsx';
+    
+    let carouselInterval = null;
+    let isPaused = false;
+    let currentIndex = 0;
+    let totalItems = 0; 
+    let visibleItems = 7;
+
+    window.addEventListener('DOMContentLoaded', initApp);
+    window.addEventListener('resize', handleResize);
+
+    function getVisibleItemsCount() {
+      const width = window.innerWidth;
+      if (width <= 480) return 2;
+      if (width <= 767) return 3;
+      if (width <= 1024) return 4;
+      return 7;
+    }
+
+    function handleResize() {
+      visibleItems = getVisibleItemsCount();
+      updateTrackPosition(false);
+    }
+
+    async function initApp() {
+      visibleItems = getVisibleItemsCount();
+      
+      // Check if user prefers reduced motion
+      const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+      if (motionQuery.matches) {
+        isPaused = true;
+        document.getElementById('togglePlayBtn').textContent = 'Play';
+        document.getElementById('togglePlayBtn').setAttribute('aria-label', 'Start Auto Rotation');
+      }
+
+      await loadExcelAndInitCarousel();
+      setupEventListeners();
+    }
+
+    async function loadExcelAndInitCarousel() {
+      const status = document.getElementById('status');
+      const srStatus = document.getElementById('sr-status');
+      const track = document.getElementById('carouselTrack');
+      const region = document.getElementById('carouselRegion');
+
+      try {
+        status.textContent = `Fetching ${EXCEL_FILE_PATH}...`;
+        
+        const response = await fetch(EXCEL_FILE_PATH);
+        if (!response.ok) throw new Error(`Failed to fetch file (Status: ${response.status})`);
+
+        const arrayBuffer = await response.arrayBuffer();
+        const data = new Uint8Array(arrayBuffer);
+        
+        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(worksheet, { raw: false, defval: '' });
+
+        status.textContent = 'Processing book covers...';
+        const validCovers = [];
+
+        rows.forEach(row => {
+          const imgUrlKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'img_url');
+          const imgUrl = imgUrlKey ? String(row[imgUrlKey]).trim() : '';
+          
+          // Optional: Record link fallback if present
+          const recordKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'record_url');
+          const recordUrl = recordKey ? String(row[recordKey]).trim() : '#';
+
+          if (imgUrl) {
+            validCovers.push({ imgUrl, recordUrl });
+          }
+        });
+
+        if (validCovers.length === 0) {
+          status.textContent = 'No image URLs found in the img_url column.';
+          srStatus.textContent = 'No image URLs found.';
+          return;
+        }
+
+        status.textContent = `Loaded ${validCovers.length} book cover(s).`;
+        srStatus.textContent = `Loaded ${validCovers.length} book covers in carousel.`;
+        region.style.display = 'block';
+        totalItems = validCovers.length;
+
+        // 1. Render all original book cards
+        validCovers.forEach((item, idx) => {
+          const card = createBookCard(item.imgUrl, item.recordUrl, `Book Cover ${idx + 1}`);
+          track.appendChild(card);
+        });
+
+        if (totalItems > visibleItems) {
+          // 2. Add single empty space spacer card
+          const emptySpacer = track.firstElementChild.cloneNode(true);
+          emptySpacer.setAttribute('aria-hidden', 'true');
+          emptySpacer.style.visibility = 'hidden'; 
+          track.appendChild(emptySpacer);
+
+          // 3. Append clones for infinite seamless looping
+          for (let i = 0; i < 7; i++) {
+            const clone = track.children[i].cloneNode(true);
+            clone.setAttribute('aria-hidden', 'true'); // Hide clones from screen readers
+            track.appendChild(clone);
+          }
+        }
+
+        startCarousel();
+
+      } catch (err) {
+        console.error(err);
+        status.textContent = `Error loading file: ${err.message}`;
+      }
+    }
+
+    function createBookCard(imgUrl, recordUrl, altText) {
+      const card = document.createElement('div');
+      card.className = 'book-card';
+      
+      const content = recordUrl && recordUrl !== '#' 
+        ? `<a href="${recordUrl}" target="_blank" rel="noopener" aria-label="${altText} - Open in Catalog">
+            <img src="${imgUrl}" alt="${altText}" onError="this.style.visibility='hidden';" />
+           </a>`
+        : `<img src="${imgUrl}" alt="${altText}" onError="this.style.visibility='hidden';" />`;
+
+      card.innerHTML = content;
+      return card;
+    }
+
+    function updateTrackPosition(animated = true) {
+      const track = document.getElementById('carouselTrack');
+      const firstCard = track.firstElementChild;
+      if (!firstCard) return;
+
+      const cardWidth = firstCard.offsetWidth;
+      const gap = 15;
+      const shiftPx = currentIndex * (cardWidth + gap);
+
+      track.style.transition = animated ? 'transform 0.5s ease-in-out' : 'none';
+      track.style.transform = `translateX(-${shiftPx}px)`;
+    }
+
+    function rotateCarousel() {
+      if (totalItems <= visibleItems) return;
+
+      currentIndex++;
+      updateTrackPosition(true);
+
+      // Handle loop reset at totalItems + 1 (accounts for empty spacer)
+      if (currentIndex === totalItems + 1) {
+        setTimeout(() => {
+          currentIndex = 0;
+          updateTrackPosition(false);
+          void document.getElementById('carouselTrack').offsetWidth; // Force reflow
+        }, 500);
+      }
+    }
+
+    function setupEventListeners() {
+      const region = document.getElementById('carouselRegion');
+      const toggleBtn = document.getElementById('togglePlayBtn');
+      const prevBtn = document.getElementById('prevBtn');
+      const nextBtn = document.getElementById('nextBtn');
+      const srStatus = document.getElementById('sr-status');
+
+      // Pause on Mouse Enter / Focus
+      region.addEventListener('mouseenter', stopCarousel);
+      region.addEventListener('mouseleave', () => { if (!isPaused) startCarousel(); });
+      region.addEventListener('focusin', stopCarousel);
+      region.addEventListener('focusout', () => { if (!isPaused) startCarousel(); });
+
+      // Manual Navigation Controls
+      toggleBtn.addEventListener('click', () => {
+        isPaused = !isPaused;
+        if (isPaused) {
+          stopCarousel();
+          toggleBtn.textContent = 'Play';
+          toggleBtn.setAttribute('aria-label', 'Start Auto Rotation');
+          srStatus.textContent = 'Carousel paused.';
+        } else {
+          startCarousel();
+          toggleBtn.textContent = 'Pause';
+          toggleBtn.setAttribute('aria-label', 'Pause Auto Rotation');
+          srStatus.textContent = 'Carousel playing.';
+        }
+      });
+
+      prevBtn.addEventListener('click', () => {
+        stopCarousel();
+        currentIndex = currentIndex <= 0 ? totalItems : currentIndex - 1;
+        updateTrackPosition(true);
+        srStatus.textContent = `Showing book ${currentIndex + 1}`;
+      });
+
+      nextBtn.addEventListener('click', () => {
+        stopCarousel();
+        rotateCarousel();
+        srStatus.textContent = `Showing book ${currentIndex + 1}`;
+      });
+    }
+
+    function startCarousel() {
+      if (carouselInterval || isPaused || totalItems <= visibleItems) return;
+      carouselInterval = setInterval(rotateCarousel, 2000);
+    }
+
+    function stopCarousel() {
+      if (carouselInterval) {
+        clearInterval(carouselInterval);
+        carouselInterval = null;
+      }
+    }
+  </script>
+
+</body>
+</html>
