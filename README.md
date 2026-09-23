@@ -9,3 +9,9 @@
 - Hover behaviors: magnifies book covers by 1.15 times on mouse hover or keyboard focus, displaying the book title immediately on a card and author after a 1-second delay.
 - Linking: Clicking any book cover opens Primo record in a new tab
 - Responsive layout: dynamically adjusts the number of visible covers based on screen size (displaying 7 on desktops, 4 on tablets, and 2 to 3 on phones).
+
+*Web Accessibility (WCAG) Features*
+- Screen reader live announcements (aria-live): Features a hidden status region that announces state updates (e.g., pause/play status or active slide shifts) to screen reader users.
+- Motion Sensitivity Compliance (prefers-reduced-motion): Automatically respects user operating system preferences by disabling auto-rotation and animations for users sensitive to motion.
+- Keyboard Focus Indicators (:focus-visible): Ensures high-contrast focus outlines around all interactive links and buttons for keyboard-only navigation.
+- Aria Labeling & Hidden Clones: Decorative looping duplicates are marked with aria-hidden="true" to prevent redundant screen reader announcements, and links include descriptive aria-label text combining titles and authors. 
