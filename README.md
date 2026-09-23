@@ -1,3 +1,3 @@
 # Carousel Design for New Books #
 - index.html is a self-contained .html file that has html, CSS, and script.
-- index.html reads new-arrivals.xlsx for image display
+- index.html reads new-arrivals.xlsx for image display.
