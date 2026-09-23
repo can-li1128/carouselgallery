@@ -189,12 +189,29 @@
 
     function formatAuthorName(rawAuthor) {
       if (!rawAuthor) return '';
-      const str = String(rawAuthor).trim();
+      let str = String(rawAuthor).trim();
+      
+      // Remove MARC subfield codes (e.g. $$Q,$$R) if present
+      str = str.replace(/\$\$[A-Z].*/g, '').trim();
+      
       if (str.includes(',')) {
-        const parts = str.split(',');
-        const lastName = parts[0].trim();
-        const firstName = parts.slice(1).join(' ').trim();
-        return `${firstName} ${lastName}`;
+        const parts = str.split(',').map(p => p.trim()).filter(Boolean);
+        if (parts.length >= 2) {
+          const lastName = parts[0].replace(/[.,;]$/, '');
+          let firstName = parts[1];
+          
+          // Remove dates (e.g. 1835-1901, 1902-) and numbers
+          firstName = firstName.replace(/\b\d{4}(-\d{4})?\b/g, '').replace(/[0-9]/g, '').trim();
+          
+          // Remove trailing role labels if present (e.g., author, editor)
+          firstName = firstName.replace(/\b(author|editor|translator|compiler)\b/gi, '').trim();
+          firstName = firstName.replace(/[.,;]$/, '').trim();
+          
+          if (firstName) {
+            return `${firstName} ${lastName}`;
+          }
+          return lastName;
+        }
       }
       return str;
     }
